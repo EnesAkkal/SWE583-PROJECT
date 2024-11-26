@@ -151,7 +151,7 @@ def train_model(max_classes=5, max_videos_per_class=2, test_split=0.2, reuse_cla
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=0.001)
 
-    num_epochs = 2
+    num_epochs = 3
     history = {"train_loss": [], "val_loss": []}
 
     for epoch in range(num_epochs):
