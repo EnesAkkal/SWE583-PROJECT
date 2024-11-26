@@ -126,14 +126,14 @@ def train_model(max_classes=5, max_videos_per_class=2, test_split=0.2):
     train_dataset, test_dataset = random_split(dataset, [train_size, test_size])
     print(f"Train set: {len(train_dataset)} samples, Test set: {len(test_dataset)} samples.")
 
-    train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
-    test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
+    train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True)
+    test_loader = DataLoader(test_dataset, batch_size=64, shuffle=False)
 
     num_classes = len(dataset.classes)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = ActionRecognitionModel(num_classes=num_classes).to(device)
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=0.001)
+    optimizer = optim.Adam(model.parameters(), lr=1)
 
     num_epochs = 2
     history = {"train_loss": []}
@@ -247,7 +247,7 @@ if __name__ == "__main__":
 
     # Step 2: Train the model with limited classes and videos per class
     print("Step 2: Training the model...")
-    trained_model, test_loader, classes = train_model(max_classes=10, max_videos_per_class=2)
+    trained_model, test_loader, classes = train_model(max_classes=2, max_videos_per_class=2)
 
     # Step 3: Evaluate on test set
     print("Step 3: Evaluating on test set...")
