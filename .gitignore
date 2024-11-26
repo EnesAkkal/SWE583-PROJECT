@@ -4,6 +4,8 @@ venv/
 # Ignore data directory
 data/
 
+results/
+
 # Ignore macOS system files
 .DS_Store
 

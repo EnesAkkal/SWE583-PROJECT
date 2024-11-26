@@ -152,12 +152,14 @@ def train_model(max_classes=5, max_videos_per_class=2, test_split=0.2, reuse_cla
     optimizer = optim.Adam(model.parameters(), lr=0.001)
 
     num_epochs = 3
-    history = {"train_loss": [], "val_loss": []}
+    history = {"train_loss": [], "val_loss": [], "train_acc": [], "val_acc": []}
 
     for epoch in range(num_epochs):
         # Training phase
         model.train()
         running_train_loss = 0.0
+        correct_train = 0
+        total_train = 0
         for images, labels in train_loader:
             images, labels = images.to(device), labels.to(device)
             outputs = model(images)
@@ -167,12 +169,20 @@ def train_model(max_classes=5, max_videos_per_class=2, test_split=0.2, reuse_cla
             optimizer.step()
             running_train_loss += loss.item()
 
+            _, preds = torch.max(outputs, 1)
+            correct_train += (preds == labels).sum().item()
+            total_train += labels.size(0)
+
         epoch_train_loss = running_train_loss / len(train_loader)
+        train_accuracy = correct_train / total_train
         history["train_loss"].append(epoch_train_loss)
+        history["train_acc"].append(train_accuracy)
 
         # Validation phase
         model.eval()
         running_val_loss = 0.0
+        correct_val = 0
+        total_val = 0
         with torch.no_grad():
             for images, labels in test_loader:
                 images, labels = images.to(device), labels.to(device)
@@ -180,15 +190,22 @@ def train_model(max_classes=5, max_videos_per_class=2, test_split=0.2, reuse_cla
                 loss = criterion(outputs, labels)
                 running_val_loss += loss.item()
 
+                _, preds = torch.max(outputs, 1)
+                correct_val += (preds == labels).sum().item()
+                total_val += labels.size(0)
+
         epoch_val_loss = running_val_loss / len(test_loader)
+        val_accuracy = correct_val / total_val
         history["val_loss"].append(epoch_val_loss)
+        history["val_acc"].append(val_accuracy)
 
-        print(f"Epoch [{epoch+1}/{num_epochs}], Train Loss: {epoch_train_loss:.4f}, Val Loss: {epoch_val_loss:.4f}")
+        print(f"Epoch [{epoch+1}/{num_epochs}], Train Loss: {epoch_train_loss:.4f}, Val Loss: {epoch_val_loss:.4f}, Train Acc: {train_accuracy:.4f}, Val Acc: {val_accuracy:.4f}")
 
-    # Save loss curves
+    # Save loss and accuracy curves
     plt.figure(figsize=(10, 5))
-    plt.plot(range(1, num_epochs + 1), history["train_loss"], label="Training Loss")
-    plt.plot(range(1, num_epochs + 1), history["val_loss"], label="Validation Loss")
+    epochs = range(1, num_epochs + 1)
+    plt.plot(epochs, history["train_loss"], label="Training Loss")
+    plt.plot(epochs, history["val_loss"], label="Validation Loss")
     plt.title("Training and Validation Loss")
     plt.xlabel("Epoch")
     plt.ylabel("Loss")
@@ -196,7 +213,19 @@ def train_model(max_classes=5, max_videos_per_class=2, test_split=0.2, reuse_cla
     plt.grid()
     plt.savefig(os.path.join(RESULTS_DIR, "train_val_loss.png"))
     plt.close()
-    print("Training complete and loss visualization saved.")
+
+    plt.figure(figsize=(10, 5))
+    plt.plot(epochs, history["train_acc"], label="Training Accuracy")
+    plt.plot(epochs, history["val_acc"], label="Validation Accuracy")
+    plt.title("Training and Validation Accuracy")
+    plt.xlabel("Epoch")
+    plt.ylabel("Accuracy")
+    plt.legend()
+    plt.grid()
+    plt.savefig(os.path.join(RESULTS_DIR, "train_val_accuracy.png"))
+    plt.close()
+
+    print("Training complete. Loss and accuracy visualizations saved.")
     return model, test_loader, dataset.classes
 
 # ------------------ Evaluation Script ------------------
