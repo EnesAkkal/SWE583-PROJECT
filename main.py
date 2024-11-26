@@ -11,6 +11,7 @@ from sklearn.metrics import classification_report, confusion_matrix
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
+from torchvision.transforms import ToPILImage
 
 # ------------------ Frame Extraction ------------------
 DATA_DIR = "./data/UCF-101"  # Path to UCF-101 dataset
@@ -166,7 +167,7 @@ def train_model(max_classes=5, max_videos_per_class=2, test_split=0.2):
     print("Training complete and loss visualization saved.")
     return model, test_loader, dataset.classes
 
-# ------------------ Inference Script ------------------
+# ------------------ Evaluation Script ------------------
 def evaluate_model(model, test_loader, classes):
     model.eval()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -200,6 +201,45 @@ def evaluate_model(model, test_loader, classes):
     print("Confusion matrix saved.")
     return cm
 
+# ------------------ Visualization Script ------------------
+def demonstrate_model(model, test_dataset, classes):
+    """
+    Demonstrate the model by randomly selecting 10 videos from the test set and showing predictions.
+    For each video, only one frame is shown.
+    """
+    # Ensure evaluation mode
+    model.eval()
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    # Randomly select 10 frames from the test dataset
+    random_indices = random.sample(range(len(test_dataset)), 10)
+    samples = [test_dataset[i] for i in random_indices]
+
+    # Prepare a plot
+    plt.figure(figsize=(15, 10))
+    for i, (image, true_label) in enumerate(samples):
+        image = image.to(device).unsqueeze(0)  # Add batch dimension
+        with torch.no_grad():
+            outputs = model(image)
+            _, predicted_label = torch.max(outputs, 1)
+
+        # Convert tensor to image for display
+        image = image.squeeze(0).permute(1, 2, 0).cpu().numpy()  # Convert to HWC format
+        image = (image * 255).astype("uint8")  # Normalize to 0-255
+
+        # Plot the image and prediction
+        plt.subplot(2, 5, i + 1)
+        plt.imshow(image)
+        plt.title(f"True: {classes[true_label]}\nPred: {classes[predicted_label.item()]}")
+        plt.axis("off")
+
+    # Save the demonstration results to the results folder
+    plt.tight_layout()
+    plt.savefig(os.path.join(RESULTS_DIR, "model_demonstration.png"))
+    plt.show()
+    print("Model demonstration visualization saved as 'model_demonstration.png' in the results folder.")
+
+# ------------------ Main Script ------------------
 if __name__ == "__main__":
     # Step 1: Extract frames from videos (optional if already done)
     # print("Step 1: Extracting frames...")
@@ -211,4 +251,8 @@ if __name__ == "__main__":
 
     # Step 3: Evaluate on test set
     print("Step 3: Evaluating on test set...")
-    evaluate_model(trained_model, test_loader, classes)
+    cm = evaluate_model(trained_model, test_loader, classes)
+
+    # Step 4: Demonstrate model predictions
+    print("Step 4: Demonstrating model predictions...")
+    demonstrate_model(trained_model, test_loader.dataset, classes)
