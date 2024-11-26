@@ -58,16 +58,33 @@ def extract_frames(video_dir, frame_dir):
 
 # ------------------ Dataset Class ------------------
 class UCF101Dataset(Dataset):
-    def __init__(self, frame_dir, max_classes=None, max_videos_per_class=None, transform=None):
+    def __init__(self, frame_dir, max_classes=None, max_videos_per_class=None, transform=None, reuse_classes=False):
         self.frame_dir = frame_dir
         self.transform = transform
         self.samples = []
-        self.classes = sorted(os.listdir(frame_dir))
-        
+        self.classes_file = os.path.join(RESULTS_DIR, "selected_classes.txt")
+
+        # Load classes
+        all_classes = sorted(os.listdir(frame_dir))
+
         if max_classes:
-            random.shuffle(self.classes)
-            self.classes = self.classes[:max_classes]
-        
+            if reuse_classes and os.path.exists(self.classes_file):
+                # Load previously selected classes
+                with open(self.classes_file, "r") as f:
+                    self.classes = [line.strip() for line in f.readlines()]
+                print(f"Reusing previously selected classes: {self.classes}")
+            else:
+                # Randomly shuffle and select new classes
+                random.shuffle(all_classes)
+                self.classes = all_classes[:max_classes]
+                # Save selected classes to file
+                with open(self.classes_file, "w") as f:
+                    for cls in self.classes:
+                        f.write(cls + "\n")
+                print(f"Randomly selected new classes: {self.classes}")
+        else:
+            self.classes = all_classes
+
         self.class_to_idx = {cls: idx for idx, cls in enumerate(self.classes)}
 
         for cls in self.classes:
@@ -85,7 +102,6 @@ class UCF101Dataset(Dataset):
                             frame_path = os.path.join(video_path, frame)
                             self.samples.append((frame_path, self.class_to_idx[cls]))
 
-        print(f"Randomly Selected Classes: {self.classes}")
         print(f"Loaded {len(self.samples)} samples from {len(self.classes)} classes.")
 
     def __len__(self):
@@ -111,7 +127,7 @@ class ActionRecognitionModel(nn.Module):
         return self.resnet(x)
 
 # ------------------ Training Script ------------------
-def train_model(max_classes=5, max_videos_per_class=2, test_split=0.2):
+def train_model(max_classes=5, max_videos_per_class=2, test_split=0.2, reuse_classes=False):
     transform = transforms.Compose([
         transforms.ToPILImage(),
         transforms.Resize((224, 224)),
@@ -119,7 +135,7 @@ def train_model(max_classes=5, max_videos_per_class=2, test_split=0.2):
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ])
 
-    dataset = UCF101Dataset(FRAME_DIR, max_classes=max_classes, max_videos_per_class=max_videos_per_class, transform=transform)
+    dataset = UCF101Dataset(FRAME_DIR, max_classes=max_classes, max_videos_per_class=max_videos_per_class, transform=transform, reuse_classes=reuse_classes)
     dataset_size = len(dataset)
     test_size = int(test_split * dataset_size)
     train_size = dataset_size - test_size
@@ -133,14 +149,15 @@ def train_model(max_classes=5, max_videos_per_class=2, test_split=0.2):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = ActionRecognitionModel(num_classes=num_classes).to(device)
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=1)
+    optimizer = optim.Adam(model.parameters(), lr=0.001)
 
     num_epochs = 2
-    history = {"train_loss": []}
+    history = {"train_loss": [], "val_loss": []}
 
     for epoch in range(num_epochs):
+        # Training phase
         model.train()
-        running_loss = 0.0
+        running_train_loss = 0.0
         for images, labels in train_loader:
             images, labels = images.to(device), labels.to(device)
             outputs = model(images)
@@ -148,21 +165,36 @@ def train_model(max_classes=5, max_videos_per_class=2, test_split=0.2):
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-            running_loss += loss.item()
+            running_train_loss += loss.item()
 
-        epoch_loss = running_loss / len(train_loader)
-        history["train_loss"].append(epoch_loss)
-        print(f"Epoch [{epoch+1}/{num_epochs}], Loss: {epoch_loss:.4f}")
+        epoch_train_loss = running_train_loss / len(train_loader)
+        history["train_loss"].append(epoch_train_loss)
 
-    # Save loss curve
+        # Validation phase
+        model.eval()
+        running_val_loss = 0.0
+        with torch.no_grad():
+            for images, labels in test_loader:
+                images, labels = images.to(device), labels.to(device)
+                outputs = model(images)
+                loss = criterion(outputs, labels)
+                running_val_loss += loss.item()
+
+        epoch_val_loss = running_val_loss / len(test_loader)
+        history["val_loss"].append(epoch_val_loss)
+
+        print(f"Epoch [{epoch+1}/{num_epochs}], Train Loss: {epoch_train_loss:.4f}, Val Loss: {epoch_val_loss:.4f}")
+
+    # Save loss curves
     plt.figure(figsize=(10, 5))
-    plt.plot(range(1, num_epochs + 1), history["train_loss"], label="Training Loss", marker="o")
-    plt.title("Training Loss over Epochs")
+    plt.plot(range(1, num_epochs + 1), history["train_loss"], label="Training Loss")
+    plt.plot(range(1, num_epochs + 1), history["val_loss"], label="Validation Loss")
+    plt.title("Training and Validation Loss")
     plt.xlabel("Epoch")
     plt.ylabel("Loss")
     plt.legend()
     plt.grid()
-    plt.savefig(os.path.join(RESULTS_DIR, "training_loss.png"))
+    plt.savefig(os.path.join(RESULTS_DIR, "train_val_loss.png"))
     plt.close()
     print("Training complete and loss visualization saved.")
     return model, test_loader, dataset.classes
@@ -201,58 +233,23 @@ def evaluate_model(model, test_loader, classes):
     print("Confusion matrix saved.")
     return cm
 
-# ------------------ Visualization Script ------------------
-def demonstrate_model(model, test_dataset, classes):
-    """
-    Demonstrate the model by randomly selecting 10 videos from the test set and showing predictions.
-    For each video, only one frame is shown.
-    """
-    # Ensure evaluation mode
-    model.eval()
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-    # Randomly select 10 frames from the test dataset
-    random_indices = random.sample(range(len(test_dataset)), 10)
-    samples = [test_dataset[i] for i in random_indices]
-
-    # Prepare a plot
-    plt.figure(figsize=(15, 10))
-    for i, (image, true_label) in enumerate(samples):
-        image = image.to(device).unsqueeze(0)  # Add batch dimension
-        with torch.no_grad():
-            outputs = model(image)
-            _, predicted_label = torch.max(outputs, 1)
-
-        # Convert tensor to image for display
-        image = image.squeeze(0).permute(1, 2, 0).cpu().numpy()  # Convert to HWC format
-        image = (image * 255).astype("uint8")  # Normalize to 0-255
-
-        # Plot the image and prediction
-        plt.subplot(2, 5, i + 1)
-        plt.imshow(image)
-        plt.title(f"True: {classes[true_label]}\nPred: {classes[predicted_label.item()]}")
-        plt.axis("off")
-
-    # Save the demonstration results to the results folder
-    plt.tight_layout()
-    plt.savefig(os.path.join(RESULTS_DIR, "model_demonstration.png"))
-    plt.show()
-    print("Model demonstration visualization saved as 'model_demonstration.png' in the results folder.")
-
 # ------------------ Main Script ------------------
 if __name__ == "__main__":
-    # Step 1: Extract frames from videos (optional if already done)
+    # Step 1: Ask user whether to reuse previously selected classes
+    reuse_classes = False
+    if os.path.exists(os.path.join(RESULTS_DIR, "selected_classes.txt")):
+        user_input = input("Do you want to reuse the previously selected classes? (yes/no): ").strip().lower()
+        if user_input == "yes":
+            reuse_classes = True
+
+    # Step 2: Extract frames from videos (optional if already done)
     # print("Step 1: Extracting frames...")
     # extract_frames(DATA_DIR, FRAME_DIR)
 
-    # Step 2: Train the model with limited classes and videos per class
+    # Step 3: Train the model with limited classes and videos per class
     print("Step 2: Training the model...")
-    trained_model, test_loader, classes = train_model(max_classes=2, max_videos_per_class=2)
+    trained_model, test_loader, classes = train_model(max_classes=2, max_videos_per_class=2, reuse_classes=reuse_classes)
 
-    # Step 3: Evaluate on test set
+    # Step 4: Evaluate on test set
     print("Step 3: Evaluating on test set...")
     cm = evaluate_model(trained_model, test_loader, classes)
-
-    # Step 4: Demonstrate model predictions
-    print("Step 4: Demonstrating model predictions...")
-    demonstrate_model(trained_model, test_loader.dataset, classes)
