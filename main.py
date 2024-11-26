@@ -9,10 +9,16 @@ import torch.nn as nn
 import torch.optim as optim
 from sklearn.metrics import classification_report, confusion_matrix
 import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 # ------------------ Frame Extraction ------------------
 DATA_DIR = "./data/UCF-101"  # Path to UCF-101 dataset
 FRAME_DIR = "./data/frames"  # Path where extracted frames will be stored
+RESULTS_DIR = "./results"  # Directory to store results (visualizations, metrics)
+
+if not os.path.exists(RESULTS_DIR):
+    os.makedirs(RESULTS_DIR)
 
 def extract_frames(video_dir, frame_dir):
     """Extract frames from all videos in UCF-101 dataset."""
@@ -129,6 +135,8 @@ def train_model(max_classes=5, max_videos_per_class=2, test_split=0.2):
     optimizer = optim.Adam(model.parameters(), lr=0.001)
 
     num_epochs = 2
+    history = {"train_loss": []}
+
     for epoch in range(num_epochs):
         model.train()
         running_loss = 0.0
@@ -141,9 +149,21 @@ def train_model(max_classes=5, max_videos_per_class=2, test_split=0.2):
             optimizer.step()
             running_loss += loss.item()
 
-        print(f"Epoch [{epoch+1}/{num_epochs}], Loss: {running_loss/len(train_loader):.4f}")
+        epoch_loss = running_loss / len(train_loader)
+        history["train_loss"].append(epoch_loss)
+        print(f"Epoch [{epoch+1}/{num_epochs}], Loss: {epoch_loss:.4f}")
 
-    print("Training complete.")
+    # Save loss curve
+    plt.figure(figsize=(10, 5))
+    plt.plot(range(1, num_epochs + 1), history["train_loss"], label="Training Loss", marker="o")
+    plt.title("Training Loss over Epochs")
+    plt.xlabel("Epoch")
+    plt.ylabel("Loss")
+    plt.legend()
+    plt.grid()
+    plt.savefig(os.path.join(RESULTS_DIR, "training_loss.png"))
+    plt.close()
+    print("Training complete and loss visualization saved.")
     return model, test_loader, dataset.classes
 
 # ------------------ Inference Script ------------------
@@ -169,6 +189,15 @@ def evaluate_model(model, test_loader, classes):
     cm = confusion_matrix(all_labels, all_predictions)
     print(cm)
 
+    # Save confusion matrix as image
+    plt.figure(figsize=(10, 8))
+    sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", xticklabels=classes, yticklabels=classes)
+    plt.title("Confusion Matrix")
+    plt.xlabel("Predicted")
+    plt.ylabel("True")
+    plt.savefig(os.path.join(RESULTS_DIR, "confusion_matrix.png"))
+    plt.close()
+    print("Confusion matrix saved.")
     return cm
 
 if __name__ == "__main__":
@@ -178,7 +207,7 @@ if __name__ == "__main__":
 
     # Step 2: Train the model with limited classes and videos per class
     print("Step 2: Training the model...")
-    trained_model, test_loader, classes = train_model(max_classes=2, max_videos_per_class=2)
+    trained_model, test_loader, classes = train_model(max_classes=10, max_videos_per_class=2)
 
     # Step 3: Evaluate on test set
     print("Step 3: Evaluating on test set...")
