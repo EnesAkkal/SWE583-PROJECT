@@ -16,10 +16,10 @@ from torchvision.transforms import ToPILImage
 # ------------------ Frame Extraction ------------------
 DATA_DIR = "./data/UCF-101"  # Path to UCF-101 dataset
 FRAME_DIR = "./data/frames"  # Path where extracted frames will be stored
-RESULTS_DIR = "./results"  # Directory to store results (visualizations, metrics)
+BASE_RESULTS_DIR = "./results"  # Base directory for results
 
-if not os.path.exists(RESULTS_DIR):
-    os.makedirs(RESULTS_DIR)
+if not os.path.exists(BASE_RESULTS_DIR):
+    os.makedirs(BASE_RESULTS_DIR)
 
 def extract_frames(video_dir, frame_dir):
     """Extract frames from all videos in UCF-101 dataset."""
@@ -62,7 +62,7 @@ class UCF101Dataset(Dataset):
         self.frame_dir = frame_dir
         self.transform = transform
         self.samples = []
-        self.classes_file = os.path.join(RESULTS_DIR, "selected_classes.txt")
+        self.classes_file = os.path.join(BASE_RESULTS_DIR, "selected_classes.txt")
 
         # Load classes
         all_classes = sorted(os.listdir(frame_dir))
@@ -127,7 +127,16 @@ class ActionRecognitionModel(nn.Module):
         return self.resnet(x)
 
 # ------------------ Training Script ------------------
-def train_model(max_classes=5, max_videos_per_class=2, test_split=0.2, reuse_classes=False):
+def train_model(max_classes=5, max_videos_per_class=2, test_split=0.2, reuse_classes=False, learning_rate=0.01, batch_size=64, epochs=3):
+    # Create results directory based on parameters
+    results_dir = os.path.join(
+        BASE_RESULTS_DIR,
+        f"classes_{max_classes}_videos_{max_videos_per_class}_lr_{learning_rate}_bs_{batch_size}_epochs_{epochs}"
+    )
+    if not os.path.exists(results_dir):
+        os.makedirs(results_dir)
+
+
     transform = transforms.Compose([
         transforms.ToPILImage(),
         transforms.Resize((224, 224)),
@@ -135,7 +144,7 @@ def train_model(max_classes=5, max_videos_per_class=2, test_split=0.2, reuse_cla
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ])
 
-    dataset = UCF101Dataset(FRAME_DIR, max_classes=max_classes, max_videos_per_class=max_videos_per_class, transform=transform, reuse_classes=reuse_classes)
+    dataset = UCF101Dataset(FRAME_DIR, max_classes=5, max_videos_per_class=max_videos_per_class, transform=transform, reuse_classes=reuse_classes)
     dataset_size = len(dataset)
     test_size = int(test_split * dataset_size)
     train_size = dataset_size - test_size
@@ -149,7 +158,7 @@ def train_model(max_classes=5, max_videos_per_class=2, test_split=0.2, reuse_cla
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = ActionRecognitionModel(num_classes=num_classes).to(device)
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=0.001)
+    optimizer = optim.Adam(model.parameters(), lr=0.01)
 
     num_epochs = 3
     history = {"train_loss": [], "val_loss": [], "train_acc": [], "val_acc": []}
@@ -211,7 +220,7 @@ def train_model(max_classes=5, max_videos_per_class=2, test_split=0.2, reuse_cla
     plt.ylabel("Loss")
     plt.legend()
     plt.grid()
-    plt.savefig(os.path.join(RESULTS_DIR, "train_val_loss.png"))
+    plt.savefig(os.path.join(results_dir, "train_val_loss.png"))
     plt.close()
 
     plt.figure(figsize=(10, 5))
@@ -222,14 +231,14 @@ def train_model(max_classes=5, max_videos_per_class=2, test_split=0.2, reuse_cla
     plt.ylabel("Accuracy")
     plt.legend()
     plt.grid()
-    plt.savefig(os.path.join(RESULTS_DIR, "train_val_accuracy.png"))
+    plt.savefig(os.path.join(results_dir, "train_val_accuracy.png"))
     plt.close()
 
     print("Training complete. Loss and accuracy visualizations saved.")
-    return model, test_loader, dataset.classes
+    return model, test_loader, dataset.classes, results_dir
 
 # ------------------ Evaluation Script ------------------
-def evaluate_model(model, test_loader, classes):
+def evaluate_model(model, test_loader, classes, results_dir):
     model.eval()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     all_labels = []
@@ -257,7 +266,7 @@ def evaluate_model(model, test_loader, classes):
     plt.title("Confusion Matrix")
     plt.xlabel("Predicted")
     plt.ylabel("True")
-    plt.savefig(os.path.join(RESULTS_DIR, "confusion_matrix.png"))
+    plt.savefig(os.path.join(results_dir, "confusion_matrix.png"))
     plt.close()
     print("Confusion matrix saved.")
     return cm
@@ -266,7 +275,7 @@ def evaluate_model(model, test_loader, classes):
 if __name__ == "__main__":
     # Step 1: Ask user whether to reuse previously selected classes
     reuse_classes = False
-    if os.path.exists(os.path.join(RESULTS_DIR, "selected_classes.txt")):
+    if os.path.exists(os.path.join(BASE_RESULTS_DIR, "selected_classes.txt")):
         user_input = input("Do you want to reuse the previously selected classes? (yes/no): ").strip().lower()
         if user_input == "yes":
             reuse_classes = True
@@ -277,8 +286,8 @@ if __name__ == "__main__":
 
     # Step 3: Train the model with limited classes and videos per class
     print("Step 2: Training the model...")
-    trained_model, test_loader, classes = train_model(max_classes=2, max_videos_per_class=2, reuse_classes=reuse_classes)
+    trained_model, test_loader, classes, results_dir = train_model(max_classes=5, max_videos_per_class=2, reuse_classes=reuse_classes)
 
     # Step 4: Evaluate on test set
     print("Step 3: Evaluating on test set...")
-    cm = evaluate_model(trained_model, test_loader, classes)
+    cm = evaluate_model(trained_model, test_loader, classes, results_dir)
