@@ -64,8 +64,8 @@ class UCF101Dataset(Dataset):
         self.samples = []
         self.classes_file = os.path.join(BASE_RESULTS_DIR, "selected_classes.txt")
 
-        # Load classes
-        all_classes = sorted(os.listdir(frame_dir))
+        # Load classes: filter only valid directories and exclude unwanted files
+        all_classes = [cls for cls in sorted(os.listdir(frame_dir)) if os.path.isdir(os.path.join(frame_dir, cls))]
 
         if max_classes:
             if reuse_classes and os.path.exists(self.classes_file):
