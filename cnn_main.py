@@ -129,7 +129,7 @@ class ActionRecognitionModel(nn.Module):
         return self.resnet(x)
 
 # ------------------ Training Script ------------------
-def train_model(max_classes=5, max_videos_per_class=1, test_split=0.2, reuse_classes=False, learning_rate=0.01, batch_size=64, epochs=3):
+def train_model(max_classes=100, max_videos_per_class=1, test_split=0.2, reuse_classes=False, learning_rate=0.01, batch_size=64, epochs=3):
     # Create results directory based on parameters
     results_dir = os.path.join(
         BASE_RESULTS_DIR,
@@ -146,7 +146,7 @@ def train_model(max_classes=5, max_videos_per_class=1, test_split=0.2, reuse_cla
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ])
 
-    dataset = UCF101Dataset(FRAME_DIR, max_classes=5, max_videos_per_class=max_videos_per_class, transform=transform, reuse_classes=reuse_classes)
+    dataset = UCF101Dataset(FRAME_DIR, max_classes=100, max_videos_per_class=max_videos_per_class, transform=transform, reuse_classes=reuse_classes)
     dataset_size = len(dataset)
     test_size = int(test_split * dataset_size)
     train_size = dataset_size - test_size
@@ -312,13 +312,13 @@ if __name__ == "__main__":
         if user_input == "yes":
             reuse_classes = True
 
-    Step 2: Extract frames from videos (optional if already done)
-    print("Step 1: Extracting frames...")
-    extract_frames(DATA_DIR, FRAME_DIR)
+   Step 2: Extract frames from videos (optional if already done)
+   print("Step 1: Extracting frames...")
+   extract_frames(DATA_DIR, FRAME_DIR)
 
     # Step 3: Train the model with limited classes and videos per class
     print("Step 2: Training the model...")
-    trained_model, test_loader, classes, results_dir = train_model(max_classes=5, max_videos_per_class=1, reuse_classes=reuse_classes)
+    trained_model, test_loader, classes, results_dir = train_model(max_classes=100, max_videos_per_class=1, reuse_classes=reuse_classes)
 
     # Step 4: Evaluate on test set
     print("Step 3: Evaluating on test set...")
