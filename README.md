@@ -10,22 +10,23 @@ project/
 │   ├── frames/                  # Processed video frames
 │   └── UCF-101/                 # Original dataset
 ├── results/                     # Stores model training results
-│   ├── classes_100_*            # Results for CNN Model
+│   ├── cnn_classes_*            # Results for CNN Model
 │   ├── vit_classes_*            # Results for ViT model
 │   └── selected_classes.txt     # List of selected action classes
-├── venv/                        # Virtual environment (optional)
+├── venv/                        # Virtual environment 
 ├── main.py                      # Script specifically for CNN training
 ├── vit_main.py                  # Script specifically for ViT training
 ├── requirements.txt             # Dependencies for the project
 └── README.md                    # Documentation
 ```
 
+The folder structure should look like this especially for the dataset otherwise you will encounter errors.
 ---
 
 
 ## Setup
 
-1. **Clone the repository**  
+1. **Clone the repository or download the file as zip**  
    ```bash
    git clone https://github.com/EnesAkkal/SWE583-PROJECT.git
    cd project
