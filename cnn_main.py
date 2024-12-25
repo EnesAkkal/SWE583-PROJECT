@@ -312,9 +312,9 @@ if __name__ == "__main__":
         if user_input == "yes":
             reuse_classes = True
 
-    # Step 2: Extract frames from videos (optional if already done)
-    # print("Step 1: Extracting frames...")
-    # extract_frames(DATA_DIR, FRAME_DIR)
+    Step 2: Extract frames from videos (optional if already done)
+    print("Step 1: Extracting frames...")
+    extract_frames(DATA_DIR, FRAME_DIR)
 
     # Step 3: Train the model with limited classes and videos per class
     print("Step 2: Training the model...")

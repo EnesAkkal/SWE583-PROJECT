@@ -1,6 +1,6 @@
 ## Prerequisites
 - Python 3.13.0
-
+- UFC 101 DATASET - The dataset can be downloaded from https://www.crcv.ucf.edu/data/UCF101.php
 ---
 
 ## Folder Structure
