@@ -4,10 +4,8 @@
 ---
 
 ## Folder Structure
+- The folder structure should look like this especially for the dataset otherwise you will encounter errors.
 ```
-
-The folder structure should look like this especially for the dataset otherwise you will encounter errors.
-
 project/
 ├── data/                        # Contains dataset and frames
 │   ├── frames/                  # Processed video frames
