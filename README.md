@@ -18,9 +18,9 @@ project/
 ├── vit_main.py                  # Script specifically for ViT training
 ├── requirements.txt             # Dependencies for the project
 └── README.md                    # Documentation
+The folder structure should look like this especially for the dataset otherwise you will encounter errors.
 ```
 
-The folder structure should look like this especially for the dataset otherwise you will encounter errors.
 ---
 
 
