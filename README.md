@@ -15,7 +15,7 @@ project/
 │   ├── vit_classes_*            # Results for ViT model
 │   └── selected_classes.txt     # List of selected action classes
 ├── venv/                        # Virtual environment 
-├── cnn_main.py                      # Script specifically for CNN training
+├── cnn_main.py                  # Script specifically for CNN training
 ├── vit_main.py                  # Script specifically for ViT training
 ├── requirements.txt             # Dependencies for the project
 └── README.md                    # Documentation
